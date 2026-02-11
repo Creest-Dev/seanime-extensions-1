@@ -1,0 +1,13 @@
+{
+  "id": "olympusscanlation",
+  "name": "Olympus Scanlation",
+  "version": "1.0.0",
+  "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/OlympusScanlation/manifest.json",
+  "language": "typescript",
+  "type": "manga-provider",
+  "description": "Olympus scanlation manga provider.",
+  "author": "branrgx",
+  "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/OlympusScanlation/icon.png",
+  "lang": "es",
+  "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/OlympusScanlation/main.ts"
+}
