@@ -99,7 +99,7 @@ class Provider {
       .map((match, index) => ({
         url: match.trim(),
         index: index + 1,
-        headers: { Referer: `${this.baseUrl}/` },
+        headers: { Referer: `${this.baseUrl}${chapterId}` },
       }));
   }
 }
