@@ -1,13 +1,13 @@
 {
   "id": "leercapitulo",
   "name": "LeerCapitulo",
-  "version": "1.1.2",
-  "manifestURI": "https://github.com/branrgx/seanime-extensions/raw/main/src/LeerCapitulo/manifest.json",
+  "version": "1.0.2",
+  "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/LeerCapitulo/manifest.json",
   "language": "typescript",
   "type": "manga-provider",
   "description": "LeerCapitulo as a Spanish-language manga provider for Seanime, supporting manga, manhwa, and manhua.",
   "author": "branrgx",
-  "icon": "https://github.com/branrgx/seanime-extensions/raw/main/src/LeerCapitulo/logo.png",
+  "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/LeerCapitulo/icon.png",
   "lang": "es",
   "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/LeerCapitulo/main.ts"
 }

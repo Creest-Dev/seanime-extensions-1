@@ -40,8 +40,9 @@ class Provider {
     ].reverse();
 
     const chapters: ChapterDetails[] = [];
+    let index = 0;
 
-    liMatches.forEach((match, index) => {
+    liMatches.forEach((match) => {
       const block = match[1];
 
       const hrefMatch = block.match(/href="([^"]+)"/);
@@ -51,14 +52,21 @@ class Provider {
 
       const url = hrefMatch[1];
       const title = titleMatch ? titleMatch[1].trim() : "";
+      const urlSplite = url.split("/");
+      const number = urlSplite[urlSplite.length - 2];
+      if (index === 0) {
+        index = parseInt(number);
+      }
 
       chapters.push({
         id: url,
         url: this.baseUrl + url,
         title,
-        chapter: String(index),
+        chapter: String(number),
         index,
       });
+
+      index++;
     });
 
     return chapters;
