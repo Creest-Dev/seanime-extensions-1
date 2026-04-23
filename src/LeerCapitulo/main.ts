@@ -1,3 +1,5 @@
+/// <reference path="../manga-provider.d.ts" />
+
 class Provider {
   private baseUrl = "https://www.leercapitulo.co";
 
