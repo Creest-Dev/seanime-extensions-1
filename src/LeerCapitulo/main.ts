@@ -35,7 +35,9 @@ class Provider {
     if (!listMatch) return [];
 
     const listHtml = listMatch[1].replace(/\s+/g, " ");
-    const liMatches = [...listHtml.matchAll(/<li[^>]*>(.*?)<\/li>/gs)];
+    const liMatches = [
+      ...listHtml.matchAll(/<li[^>]*>(.*?)<\/li>/gs),
+    ].reverse();
 
     const chapters: ChapterDetails[] = [];
 
@@ -68,7 +70,7 @@ class Provider {
     });
     const html = await res.text();
     const arrayDataMatch = html.match(/id="array_data"[^>]*>([^<]+)</);
-    const arrayData = arrayDataMatch ? arrayDataMatch[1] : "";
+    const arrayData = (arrayDataMatch ? arrayDataMatch[1] : "").trim();
 
     const urlList = this.decodeArrayData(arrayData);
 

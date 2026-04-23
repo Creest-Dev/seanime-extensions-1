@@ -1,7 +1,7 @@
 {
   "id": "leercapitulo",
   "name": "LeerCapitulo",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/LeerCapitulo/manifest.json",
   "language": "typescript",
   "type": "manga-provider",
