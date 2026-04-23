@@ -94,10 +94,12 @@ class Provider {
     const regexSrc = /<img[^>]*src="([^"]*)"[^>]*>/gi;
     const listPages = [...html.matchAll(regexSrc)].map((match) => match[1]);
 
-    return listPages.map((match, index) => ({
-      url: match,
-      index: index + 1,
-      headers: { Referer: `${this.baseUrl}/` },
-    }));
+    return listPages
+      .filter((url) => url.includes("/WP-manga/"))
+      .map((match, index) => ({
+        url: match.trim(),
+        index: index + 1,
+        headers: { Referer: `${this.baseUrl}/` },
+      }));
   }
 }
