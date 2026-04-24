@@ -27,7 +27,9 @@ class Provider {
       `${this.baseUrl}/search/?q=${encodeURIComponent(opts.query)}`,
       { headers: { Referer: `${this.baseUrl}/` } },
     );
+
     if (!res.ok) return [];
+
     const json = await res.json();
 
     return json.map((item: any) => ({
@@ -41,7 +43,9 @@ class Provider {
     const res = await fetch(`${this.baseUrl}/manga/${mangaId}`, {
       headers: { Referer: `${this.baseUrl}/` },
     });
+
     if (!res.ok) return [];
+
     const html = await res.text();
     const match = html.match(/const\s+UsaPoncho\s*=\s*"((?:[^"\\]|\\.)*)"/s);
     const raw = match ? match[1] : "";
@@ -64,7 +68,9 @@ class Provider {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data }),
     });
+
     if (!worker.ok) return [];
+
     const workerData: WorkerResponse = await worker.json();
 
     return workerData.data.map((item) => ({
@@ -80,6 +86,9 @@ class Provider {
     const res = await fetch(`${this.baseUrl}/manga/${chapterId}`, {
       headers: { Referer: `${this.baseUrl}/` },
     });
+
+    if (!res.ok) return [];
+
     const html = await res.text();
     const divMatch = html.match(
       /<div[^>]*id=["']all["'][^>]*>([\s\S]*?)<\/div>/i,
