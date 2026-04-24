@@ -88,7 +88,7 @@ class Provider {
       });
     }
 
-    return matches;
+    return matches.reverse();
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
