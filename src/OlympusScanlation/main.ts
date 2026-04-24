@@ -76,15 +76,17 @@ class Provider {
       listChapters.push(...jsonPage.data);
     }
 
-    return listChapters.map((item) => ({
-      id: `${item.id}/comic-${mangaId}`,
-      url: `${this.webUrl}/capitulo/${item.id}/comic-${mangaId}`,
-      title: `Capítulo ${item.name}`,
-      chapter: item.name,
-      index: parseInt(item.name) ?? 0,
-      scanlator: item.team?.name ?? "Olympus",
-      updatedAt: item.published_at,
-    }));
+    return listChapters
+      .map((item) => ({
+        id: `${item.id}/comic-${mangaId}`,
+        url: `${this.webUrl}/capitulo/${item.id}/comic-${mangaId}`,
+        title: `Capítulo ${item.name}`,
+        chapter: item.name,
+        index: parseInt(item.name) ?? 0,
+        scanlator: item.team?.name ?? "Olympus",
+        updatedAt: item.published_at,
+      }))
+      .reverse();
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
