@@ -1,0 +1,13 @@
+{
+  "id": "mangas-in",
+  "name": "Mangas.in",
+  "version": "1.0.0",
+  "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/MangasIn/manifest.json",
+  "language": "typescript",
+  "type": "manga-provider",
+  "description": "Spanish manga, manhwa, and manhua library from Mangas.In for Seanime.",
+  "author": "branrgx",
+  "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/MangasIn/icon.png",
+  "lang": "es",
+  "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/MangasIn/main.ts"
+}
