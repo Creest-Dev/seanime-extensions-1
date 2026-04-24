@@ -1,7 +1,7 @@
 {
   "id": "manhwaweb",
   "name": "Manhwa Web",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/ManhwaWeb/manifest.json",
   "language": "typescript",
   "type": "manga-provider",
