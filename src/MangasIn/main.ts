@@ -73,13 +73,15 @@ class Provider {
 
     const workerData: WorkerResponse = await worker.json();
 
-    return workerData.data.map((item) => ({
-      id: `${mangaId}/${item.slug}`,
-      title: item.name,
-      chapter: item.number,
-      url: `${this.baseUrl}/manga/${mangaId}/${item.slug}`,
-      index: parseInt(item.number) ?? 0,
-    }));
+    return workerData.data
+      .map((item) => ({
+        id: `${mangaId}/${item.slug}`,
+        title: item.name,
+        chapter: item.number,
+        url: `${this.baseUrl}/manga/${mangaId}/${item.slug}`,
+        index: parseInt(item.number) ?? 0,
+      }))
+      .reverse();
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
