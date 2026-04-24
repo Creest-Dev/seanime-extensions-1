@@ -19,6 +19,8 @@ class Provider {
       },
     );
 
+    if (!requestRes.ok) return [];
+
     const json = await requestRes.json();
 
     if (!json?.data) return [];
@@ -37,6 +39,7 @@ class Provider {
       fetch(`${this.baseUrl}/manhwa/see/${slug}`, {
         method: "get",
       });
+
     let response;
     const slugs = mangaId.split("/");
     let slug = slugs[0];
@@ -70,6 +73,8 @@ class Provider {
         method: "get",
       },
     );
+
+    if (!requestRes.ok) return [];
 
     const json = await requestRes.json();
 
