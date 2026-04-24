@@ -1,82 +1,112 @@
 /// <reference path="../manga-provider.d.ts" />
 
+interface SerieItemList {
+  id: number;
+  name: string;
+  slug: string;
+  cover: string;
+  type: "comic" | "novel";
+}
+
+interface ResponseChapterItem {
+  name: string;
+  id: number;
+  team: { id: number; name: "Olympus" };
+  published_at: string;
+}
+
+interface ResponseChapterList {
+  data: ResponseChapterItem[];
+  meta: {
+    current_page: number;
+    last_page: number;
+  };
+}
+
 class Provider {
-  private api = "https://dashboard.olympusbiblioteca.com/api";
+  private webUrl = "https://olympusbiblioteca.com";
+  private baseUrl = "https://dashboard.olympusbiblioteca.com";
 
   getSettings(): Settings {
     return {
       supportsMultiLanguage: false,
-      supportsMultiScanlator: false,
+      supportsMultiScanlator: true,
     };
   }
 
-  async search(opts: { query: string }): Promise<SearchResult[]> {
-    const res = await fetch(
-      `${this.api}/search?name=${opts.query.replaceAll(" ", "+")}`,
+  async search(opts: QueryOptions): Promise<SearchResult[]> {
+    const res = await fetch(`${this.webUrl}/api/series/list`);
+
+    if (!res.ok) return [];
+
+    const data: { data: SerieItemList[] } = await res.json();
+
+    const series = data.data.filter(
+      (item) =>
+        item.name.toLowerCase().includes(opts.query.toLowerCase()) &&
+        item.type === "comic",
     );
-    const data = await res.json();
 
-    if (!data?.data) return [];
-
-    const series = data.data.filter((item: any) => item.type === "comic");
-
-    return series.map((item: any) => ({
+    return series.map((item) => ({
       id: item.slug,
       title: item.name,
-      synonyms: [],
-      year: 1,
       image: item.cover,
     }));
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
-    const res = await fetch(
-      `${this.api}/series/${mangaId}/chapters?type=comic`,
-    );
-    const dataFirstPage = await res.json();
+    const request = (page: number) =>
+      fetch(
+        `${this.baseUrl}/api/series/${mangaId}/chapters?type=comic&page=${page}&direction=desc`,
+      );
 
-    if (!dataFirstPage?.data) return [];
+    const res = await request(1);
+    if (!res.ok) return [];
 
+    const dataFirstPage: ResponseChapterList = await res.json();
+
+    const listChapters: ResponseChapterItem[] = dataFirstPage.data;
     const countPages = dataFirstPage.meta.last_page;
-    const chapters: Array<any> = dataFirstPage.data ?? [];
 
     for (let i = 2; i <= countPages; i++) {
-      const resPage = await fetch(
-        `${this.api}/series/${mangaId}/chapters?type=comic&page=${i}`,
-      );
-      const dataPage = await resPage.json();
-      chapters.push(...dataPage.data);
+      const resPage = await request(i);
+      if (!resPage.ok) break;
+
+      const jsonPage: ResponseChapterList = await resPage.json();
+      listChapters.push(...jsonPage.data);
     }
 
-    return chapters.map((item: any) => ({
-      id: `${mangaId}_$_${item.id}`,
-      url: `${this.api}/series/${mangaId}/chapters/${item.id}?type=comic`,
-      title: `Chapter ${item.name}`,
+    return listChapters.map((item) => ({
+      id: `${item.id}/comic-${mangaId}`,
+      url: `${this.webUrl}/capitulo/${item.id}/comic-${mangaId}`,
+      title: `Capítulo ${item.name}`,
       chapter: item.name,
       index: parseInt(item.name) ?? 0,
-      language: "es",
+      scanlator: item.team.name,
       updatedAt: item.published_at,
     }));
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
-    const [mangaId, chapter] = chapterId.split("_$_");
-    const res = await fetch(
-      `${this.api}/series/${mangaId}/chapters/${chapter}?type=comic`,
-    );
-    const data = await res.json();
-    const images = data.chapter?.pages;
+    const res = await fetch(`${this.webUrl}/capitulo/${chapterId}`);
 
-    if (!images?.length) return [];
+    if (!res.ok) return [];
 
-    const referer = `https://${this.api.split(".")[1]}.com`;
+    const html = await res.text();
 
-    return images.map((img: any[], i: number) => ({
-      url: img,
-      index: i,
-      headers: {
-        Referer: referer,
-      },
-    }));
+    const regexSrc = /<img[^>]*src="([^"]*)"[^>]*>/gi;
+    const listPages = [...html.matchAll(regexSrc)].map((match) => match[1]); // ?
+
+    return listPages
+      .filter(
+        (item) =>
+          item.startsWith(`${this.baseUrl}/storage/comics/`) &&
+          item.includes(chapterId.split("/")[0]),
+      )
+      .map((match, index) => ({
+        url: match.trim(),
+        index: index + 1,
+        headers: { Referer: `${this.webUrl}/capitulo/${chapterId}` },
+      }));
   }
 }
