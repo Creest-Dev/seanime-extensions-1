@@ -15,6 +15,9 @@ class Provider {
       `${this.baseUrl}/search-autocomplete?term=${encodeURIComponent(opts.query)}`,
       { headers: { Referer: `${this.baseUrl}/` } },
     );
+
+    if (!res.ok) return [];
+
     const json = await res.json();
 
     return json.map((item: any) => ({
@@ -25,11 +28,14 @@ class Provider {
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
-    // mangaId es la URL relativa, ej: "/manga/solo-leveling/"
     const res = await fetch(`${this.baseUrl}${mangaId}`, {
       headers: { Referer: `${this.baseUrl}/` },
     });
+
+    if (!res.ok) return [];
+
     const html = await res.text();
+
     const listMatch = html.match(
       /<div[^>]*class="chapter-list"[^>]*>[\s\S]*?<ul>([\s\S]*?)<\/ul>/i,
     );
@@ -78,7 +84,11 @@ class Provider {
     const res = await fetch(`${this.baseUrl}${chapterId}`, {
       headers: { Referer: `${this.baseUrl}/` },
     });
+
+    if (!res.ok) return [];
+
     const html = await res.text();
+
     const arrayDataMatch = html.match(/id="array_data"[^>]*>([^<]+)</);
     const arrayData = (arrayDataMatch ? arrayDataMatch[1] : "").trim();
 
