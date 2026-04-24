@@ -15,6 +15,9 @@ class Provider {
       `${this.baseUrl}/?s=${encodeURIComponent(opts.query)}&post_type=wp-manga`,
       { headers: { Referer: `${this.baseUrl}/` } },
     );
+
+    if (!res.ok) return [];
+
     const html = await res.text();
 
     const blocks = html.match(
@@ -53,6 +56,9 @@ class Provider {
       method: "POST",
       headers: { Referer: `${this.baseUrl}/` },
     });
+
+    if (!res.ok) return [];
+
     const html = await res.text();
 
     // Usar una sola regex para capturar todo de una vez
@@ -89,6 +95,9 @@ class Provider {
     const res = await fetch(`${this.baseUrl}${chapterId}`, {
       headers: { Referer: `${this.baseUrl}/` },
     });
+
+    if (!res.ok) return [];
+
     const html = await res.text();
 
     const regexSrc = /<img[^>]*src="([^"]*)"[^>]*>/gi;
