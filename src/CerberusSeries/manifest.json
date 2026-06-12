@@ -1,0 +1,13 @@
+{
+  "id": "cerberus-series",
+  "name": "Cerberus Series (LegionScans)",
+  "version": "1.0.0",
+  "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/CerberusSeries/manifest.json",
+  "language": "typescript",
+  "type": "manga-provider",
+  "description": "Cerberus Series (LegionScans) as a Spanish manga provider for Seanime, primarily focused on manga but also supporting manhwa/manhua.",
+  "author": "branrgx",
+  "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/CerberusSeries/icon.png",
+  "lang": "es",
+  "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/CerberusSeries/main.ts"
+}
