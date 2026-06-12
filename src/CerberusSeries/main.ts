@@ -58,23 +58,32 @@ class Provider {
       .each((i, e) => {
         const url = e.find(".eph-num>a").attr("href");
         const id = url.split(this.webUrl)[1];
-        const title = e.find(".chapternum").text().trim();
+        const title = e
+          .find(".chapternum")
+          .text()
+          .trim()
+          .replace("Chapter", "Capítulo");
         const date = new Date(e.find(".chapterdate").text());
-        const number = title.split(" ")[1];
 
         chapters.push({
           id,
           url,
           title,
-          chapter: number,
+          chapter: "",
           updatedAt: date,
         });
       });
 
-    return chapters.reverse().map((e, i) => ({
-      ...e,
-      index: i,
-    }));
+    let number = 0;
+    return chapters.reverse().map((e, i) => {
+      if (!e.id.includes("ex")) number++;
+
+      return {
+        ...e,
+        chapter: number.toString(),
+        index: i,
+      };
+    });
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
