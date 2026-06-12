@@ -24,8 +24,7 @@ interface ResponseChapterList {
 }
 
 class Provider {
-  private webUrl = "https://olympusbiblioteca.com";
-  private baseUrl = "https://dashboard.olympusbiblioteca.com";
+  private webUrl = "{{webUrl}}";
 
   getSettings(): Settings {
     return {
@@ -34,8 +33,32 @@ class Provider {
     };
   }
 
+  private formatUrl(
+    url: string,
+    defaultProtocol: "http" | "https" = "https",
+    subdomain?: string,
+  ) {
+    if (url.endsWith("/")) url = url.slice(0, -1);
+    if (!url.startsWith("http")) url = `${defaultProtocol}://` + url;
+    if (!url.startsWith("https")) url = `${defaultProtocol}://` + url;
+    if (subdomain) url = url.replace("://", `://${subdomain}.`);
+    return url;
+  }
+
+  private getApiUrl() {
+    let url = this.webUrl || "https://dashboard.olympusbiblioteca.com";
+    return this.formatUrl(url, "https", "dashboard");
+  }
+
+  private getWebUrl() {
+    let url = this.webUrl || "https://olympusbiblioteca.com";
+    return this.formatUrl(url, "https");
+  }
+
   async search(opts: QueryOptions): Promise<SearchResult[]> {
-    const res = await fetch(`${this.webUrl}/api/series/list`);
+    const url = this.getWebUrl();
+    const res = await fetch(`${url}/api/series/list`);
+    console.log(`${url}/api/series/list`);
 
     if (!res.ok) return [];
 
@@ -55,11 +78,12 @@ class Provider {
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
+    const url = this.getApiUrl();
+    const webUrl = this.getWebUrl();
     const request = (page: number) =>
       fetch(
-        `${this.baseUrl}/api/series/${mangaId}/chapters?type=comic&page=${page}&direction=desc`,
+        `${url}/api/series/${mangaId}/chapters?type=comic&page=${page}&direction=desc`,
       );
-
     const res = await request(1);
     if (!res.ok) return [];
 
@@ -79,7 +103,7 @@ class Provider {
     return listChapters
       .map((item) => ({
         id: `${item.id}/comic-${mangaId}`,
-        url: `${this.webUrl}/capitulo/${item.id}/comic-${mangaId}`,
+        url: `${webUrl}/capitulo/${item.id}/comic-${mangaId}`,
         title: `Capítulo ${item.name}`,
         chapter: item.name,
         index: parseInt(item.name) ?? 0,
@@ -90,25 +114,27 @@ class Provider {
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
-    const res = await fetch(`${this.webUrl}/capitulo/${chapterId}`);
+    const apiUrl = this.getApiUrl();
+    const webUrl = this.getWebUrl();
+    const res = await fetch(`${webUrl}/capitulo/${chapterId}`);
 
     if (!res.ok) return [];
 
     const html = await res.text();
 
     const regexSrc = /<img[^>]*src="([^"]*)"[^>]*>/gi;
-    const listPages = [...html.matchAll(regexSrc)].map((match) => match[1]); // ?
+    const listPages = [...html.matchAll(regexSrc)].map((match) => match[1]);
 
     return listPages
       .filter(
         (item) =>
-          item.startsWith(`${this.baseUrl}/storage/comics/`) &&
+          item.startsWith(`${apiUrl}/storage/comics/`) &&
           item.includes(chapterId.split("/")[0]),
       )
       .map((match, index) => ({
         url: match.trim(),
         index: index + 1,
-        headers: { Referer: `${this.webUrl}/capitulo/${chapterId}` },
+        headers: { Referer: `${webUrl}/capitulo/${chapterId}` },
       }));
   }
 }
