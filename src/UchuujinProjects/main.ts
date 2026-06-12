@@ -55,7 +55,6 @@ class Provider {
     const chapters: ChapterDetails[] = [];
     let match;
     while ((match = liRegex.exec(html)) !== null) {
-      console.log(match);
       chapters.push({
         id: match[2].split(this.webUrl)[1],
         url: match[2],

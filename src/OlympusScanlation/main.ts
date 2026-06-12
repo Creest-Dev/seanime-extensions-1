@@ -58,7 +58,6 @@ class Provider {
   async search(opts: QueryOptions): Promise<SearchResult[]> {
     const url = this.getWebUrl();
     const res = await fetch(`${url}/api/series/list`);
-    console.log(`${url}/api/series/list`);
 
     if (!res.ok) return [];
 
