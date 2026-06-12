@@ -24,7 +24,7 @@
         "name": "proxyBypassUrl",
         "label": "FlareSolverr Proxy URL",
         "type": "text",
-        "default": "http://localhost:8191"
+        "default": "http://127.0.0.1:8191"
       }
     ]
   }
