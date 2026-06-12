@@ -21,6 +21,10 @@ class Provider {
     };
   }
 
+  private stringToBool(str: string): boolean {
+    return str.toLowerCase() === "true";
+  }
+
   async search(opts: QueryOptions): Promise<SearchResult[]> {
     const data = await this.searchFetch(opts);
 
@@ -107,7 +111,7 @@ class Provider {
   async searchFetch(opts: QueryOptions): SerieSearchResponse | null {
     const url = `${this.webUrl}/wp-admin/admin-ajax.php`;
     try {
-      if (!this.useProxyBypass) {
+      if (!this.stringToBool(this.useProxyBypass)) {
         const formData = new FormData();
         formData.append("action", "ts_ac_do_search");
         formData.append("ts_ac_query", opts.query.trim());
@@ -145,7 +149,7 @@ class Provider {
   async findFetch(id: string): string | null {
     const url = `${this.webUrl}${id}`;
     try {
-      if (!this.useProxyBypass) {
+      if (!this.stringToBool(this.useProxyBypass)) {
         const res = await fetch(url);
         if (!res.ok) return null;
         const html = await res.text();
