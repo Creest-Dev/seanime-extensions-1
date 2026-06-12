@@ -1,0 +1,31 @@
+{
+  "id": "bokugents",
+  "name": "Bokugents",
+  "version": "1.0.0",
+  "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/Bokugents/manifest.json",
+  "language": "typescript",
+  "type": "manga-provider",
+  "description": "Bokugents is a scanlator dedicated to mangas in spanish, providing high-quality scans and translations.",
+  "author": "branrgx",
+  "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/Bokugents/icon.png",
+  "lang": "es",
+  "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/Bokugents/main.ts",
+  "userConfig": {
+    "requiresConfig": false,
+    "version": 1,
+    "fields": [
+      {
+        "name": "useProxyBypass",
+        "label": "Use proxy cloudflare bypass",
+        "type": "switch",
+        "default": "true"
+      },
+      {
+        "name": "proxyBypassUrl",
+        "label": "FlareSolverr Proxy URL",
+        "type": "text",
+        "default": "http://localhost:8191"
+      }
+    ]
+  }
+}
