@@ -90,7 +90,7 @@ class Provider {
         JSON.parse(sourcesJson);
       return sources[0].images.map((url, index) => ({
         index,
-        url,
+        url: new URL(url).href,
         headers: {
           Referer: `${this.webUrl}${chapterId}`,
         },
