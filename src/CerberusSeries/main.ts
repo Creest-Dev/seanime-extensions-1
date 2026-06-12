@@ -52,7 +52,6 @@ class Provider {
     const $ = LoadDoc(html);
 
     const chapters = [];
-
     $("ul.clstyle")
       .children("li")
       .each((i, e) => {
@@ -68,19 +67,26 @@ class Provider {
         chapters.push({
           id,
           url,
-          title,
-          chapter: "",
           updatedAt: date,
         });
       });
 
     let number = 0;
     return chapters.reverse().map((e, i) => {
-      if (!e.id.includes("ex")) number++;
+      let chapter;
+      if (e.id.includes("ex")) {
+        number += 0.01;
+        chapter = number.toFixed(2);
+      } else {
+        number++;
+        number = Math.trunc(number);
+        chapter = number.toString();
+      }
 
       return {
         ...e,
-        chapter: number.toString(),
+        title: `Capítulo ${chapter}`,
+        chapter,
         index: i,
       };
     });
