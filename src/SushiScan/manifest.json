@@ -1,0 +1,31 @@
+{
+  "id": "sushiscan",
+  "name": "SushiScan",
+  "version": "1.0.0",
+  "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/SushiScan/manifest.json",
+  "language": "typescript",
+  "type": "manga-provider",
+  "description": "An extension for Seanime for SushiScan, a French platform offering an extensive library of mangas, manhuas, manhwas, comics and BDs in French.",
+  "author": "branrgx",
+  "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/SushiScan/icon.png",
+  "lang": "fr",
+  "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/SushiScan/main.ts",
+  "userConfig": {
+    "requiresConfig": false,
+    "version": 1,
+    "fields": [
+      {
+        "name": "useProxyBypassSushiScan",
+        "label": "Use proxy cloudflare bypass",
+        "type": "switch",
+        "default": "true"
+      },
+      {
+        "name": "proxyBypassUrlSushiScan",
+        "label": "FlareSolverr Proxy URL",
+        "type": "text",
+        "default": "http://127.0.0.1:8191"
+      }
+    ]
+  }
+}
