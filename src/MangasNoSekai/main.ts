@@ -94,14 +94,13 @@ class Provider {
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
-    const formData = new FormData();
-    formData.append("action", "muslitos_anti_hack");
-    formData.append("page", "1");
-    formData.append("mangaid", mangaId);
-    formData.append("secret", "mihonsuckmydick");
-
     const getPage = async (page: number = 1) => {
-      formData.set("page", page.toString());
+      const formData = new FormData();
+      formData.append("action", "muslitos_anti_hack");
+      formData.append("mangaid", mangaId);
+      formData.append("secret", "mihonsuckmydick");
+      formData.append("page", page.toString());
+
       const res = await this.safeFetch(
         `${this.baseUrl}/wp-json/muslitos/v1/getcaps7`,
         {
@@ -134,7 +133,7 @@ class Provider {
     return listChapters.map((i) => ({
       id: i.link.split(this.baseUrl)[1],
       url: i.link,
-      title: `${i.name} - ${i.name_extend}`,
+      title: `${i.name}${i.name_extend ? " - " + i.name_extend : ""}`,
       chapter: i.number,
       index: parseInt(i.number),
     }));
