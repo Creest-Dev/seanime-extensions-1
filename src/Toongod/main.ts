@@ -1,8 +1,8 @@
 /// <reference path="../manga-provider.d.ts" />
 
 class Provider {
-  private useProxyBypass = "true";
-  private proxyBypassUrl = "http://127.0.0.1:2344";
+  private useProxyBypass = "{{useProxyBypass}}";
+  private proxyBypassUrl = "{{proxyBypassUrl}}";
   private baseUrl = "https://www.toongod.org";
   private cookies = "";
   private userAgent = "";
