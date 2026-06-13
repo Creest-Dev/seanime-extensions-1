@@ -8,7 +8,7 @@
   "description": "Toongod is a scanlator dedicated to mangas in spanish, providing high-quality scans and translations.",
   "author": "branrgx",
   "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/Toongod/icon.png",
-  "lang": "es",
+  "lang": "en",
   "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/Toongod/main.ts",
   "userConfig": {
     "requiresConfig": false,
