@@ -51,23 +51,27 @@ class Provider {
 
     const $ = LoadDoc(html);
 
-    const chapters = [];
+    const chapters: ChapterDetails[] = [];
     $("ul.clstyle")
       .children("li")
       .each((i, e) => {
-        const url = e.find(".eph-num>a").attr("href");
+        const url = e.find(".eph-num>a").attr("href")?.trim() ?? "";
         const id = url.split(this.webUrl)[1];
         const title = e
           .find(".chapternum")
           .text()
           .trim()
           .replace("Chapter", "Capítulo");
-        const date = new Date(e.find(".chapterdate").text());
+        const updatedAt = new Date(e.find(".chapterdate").text()).toString();
 
         chapters.push({
           id,
           url,
-          updatedAt: date,
+          title,
+          updatedAt,
+          // this override in map
+          index: i,
+          chapter: "",
         });
       });
 
@@ -85,7 +89,6 @@ class Provider {
 
       return {
         ...e,
-        title: `Capítulo ${chapter}`,
         chapter,
         index: i,
       };
