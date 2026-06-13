@@ -19,34 +19,40 @@ class Provider {
   }
 
   async search(opts: QueryOptions): Promise<SearchResult[]> {
-    const html = await this.htmlFetch(
-      `${this.baseUrl}/?s=${encodeURIComponent(opts.query)}&post_type=wp-manga`,
+    const res = await this.safeFetch(
+      `${this.baseUrl}/?s=${opts.query.trim().replaceAll(" ", "+")}&post_type=wp-manga`,
     );
 
-    if (!html) return [];
+    if (!res.ok) return [];
 
-    const blocks = html.match(
-      /<div class="row c-tabs-item__content">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/g,
-    );
-    if (!blocks) return [];
+    const html = res.text();
 
-    const searchList: SearchResult[] = [];
+    const $ = LoadDoc(html);
 
-    blocks.forEach((block) => {
-      // Extraer el slug y title del enlace principal
-      const linkMatch = block.match(/<a href="([^"]+)" title="([^"]+)">/);
+    const series: SearchResult[] = [];
 
-      // Extraer la URL de la portada
-      const imageMatch = block.match(/<img[^>]+src="([^"]+)"/);
+    $(".page-content-listing")
+      .children(".row.c-tabs-item__content")
+      .each((i, e) => {
+        const url = e.find(".tab-thumb a").attr("href")?.trim() ?? "";
+        const id = url.split(this.baseUrl)[1];
+        const title = e.find(".post-title").text().trim();
+        const image = e.find(".tab-thumb img").attr("data-src")?.trim() ?? "";
+        const year = e
+          .find(".post-content_item.mg_release .summary-content")
+          .text()
+          ?.trim();
+        const synonymsText = e
+          .find(".post-content_item.mg_alternative .summary-content")
+          .text()
+          ?.trim()
+          .split(";");
 
-      if (linkMatch && imageMatch) {
-        const id = linkMatch[1].split(this.baseUrl)[1];
-        const title = linkMatch[2];
-        const image = imageMatch[1];
-
-        searchList.push({
+        series.push({
           id,
           title,
+          synonyms: synonymsText.map((i) => i.trim()),
+          year: year ? parseInt(year) : undefined,
           image: new URL(
             `${image}&headers=${JSON.stringify({
               Referer: `${this.baseUrl}`,
@@ -55,16 +61,16 @@ class Provider {
             })}`,
           ).href,
         });
-      }
-    });
+      });
 
-    return searchList;
+    return series;
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
-    const html = await this.htmlFetch(`${this.baseUrl}${mangaId}`);
+    const res = await this.safeFetch(`${this.baseUrl}${mangaId}`);
+    if (!res.ok) return [];
 
-    if (!html) return [];
+    const html = res.text();
 
     const $ = LoadDoc(html);
 
@@ -91,9 +97,10 @@ class Provider {
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
-    const html = await this.htmlFetch(`${this.baseUrl}${chapterId}`);
+    const res = await this.safeFetch(`${this.baseUrl}${chapterId}`);
+    if (!res.ok) return [];
 
-    if (!html) return [];
+    const html = res.text();
 
     const $ = LoadDoc(html);
 
@@ -118,29 +125,18 @@ class Provider {
     return pages;
   }
 
-  private proxyReq(data: string) {
-    return fetch(`${this.proxyBypassUrl}/v1`, {
-      method: "post",
-      headers: { "Content-Type": "application/json" },
-      body: data,
-    });
-  }
-
-  async htmlFetch(url: string): Promise<string | null> {
+  private async getValidSessionHeaders(): Promise<void> {
     try {
-      if (!this.stringToBool(this.useProxyBypass)) {
-        const res = await fetch(url);
-        if (!res.ok) return null;
-        const html = await res.text();
-      }
-      const series = await this.proxyReq(
-        JSON.stringify({
+      const res = await fetch(`${this.proxyBypassUrl}/v1`, {
+        method: "post",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           cmd: "request.get",
-          url: url,
+          url: `${this.baseUrl}/wp-content/uploads/2020/09/toongod-logo.png`,
           maxTimeout: 60000,
         }),
-      );
-      const data = await series.json();
+      });
+      const data = await res.json();
 
       if (data.solution?.cookies) {
         this.cookies = data.solution.cookies
@@ -148,12 +144,33 @@ class Provider {
           .join("; ");
       }
 
-      this.userAgent = data.solution.userAgent;
+      if (data.solution?.userAgent) {
+        this.userAgent = data.solution.userAgent;
+      }
 
-      return data.solution.response;
+      return;
     } catch (e) {
-      console.log(e);
-      return null;
+      console.error(e);
+      return;
     }
+  }
+
+  private async safeFetch(
+    input: string | URL | Request,
+    init?: RequestInit | undefined = { headers: {} },
+  ): Promise<Response> {
+    if (this.stringToBool(this.useProxyBypass)) {
+      await this.getValidSessionHeaders();
+      this.useProxyBypass = "false";
+    }
+    const fetchOptions = {
+      ...init,
+      headers: {
+        ...init?.headers,
+        "User-Agent": this.userAgent,
+        Cookie: this.cookies,
+      },
+    };
+    return fetch(input, fetchOptions);
   }
 }
