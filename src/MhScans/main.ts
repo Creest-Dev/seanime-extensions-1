@@ -1,7 +1,7 @@
 /// <reference path="../manga-provider.d.ts" />
 
 class Provider {
-  private baseUrl = "https://mh.inventariooculto.com";
+  private baseUrl = "https://mhscans.com";
 
   getSettings(): Settings {
     return {
@@ -51,7 +51,6 @@ class Provider {
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
-    // mangaId es la URL relativa, ej: "/manga/solo-leveling/"
     const res = await fetch(`${this.baseUrl}${mangaId}ajax/chapters/?t=1`, {
       method: "POST",
       headers: { Referer: `${this.baseUrl}/` },
@@ -61,54 +60,81 @@ class Provider {
 
     const html = await res.text();
 
-    // Usar una sola regex para capturar todo de una vez
-    // Busca: <li class="wp-manga-chapter...">...<a href="URL">...TEXTO...</a>...</li>
-    const chapterRegex =
-      /<li[^>]*class="[^"]*wp-manga-chapter[^"]*"[^>]*>[\s\S]*?<a href="([^"]+)"[^>]*>[\s]*([^<]+)[\s]*<\/a>[\s\S]*?<\/li>/gi;
+    const $ = LoadDoc(html);
 
-    let match;
-    let index = 0;
-    // Guardar todos los matches
-    const matches: ChapterDetails[] = [];
-    while ((match = chapterRegex.exec(html)) !== null) {
-      const id = match[1].split(this.baseUrl)[1];
-      const title = match[2].trim();
+    const chapters: ChapterDetails[] = [];
+
+    $("li.wp-manga-chapter").each((i, e) => {
+      const url = e.children("a").attr("href");
+      const id = url.split(this.baseUrl)[1];
+      const title = e.children("a").text().trim();
       const titleParts =
         title.match(/Cap[ií]tulo\s+([\d.]+)(?:\s+(.+))?/i) ?? [];
       const chapter = titleParts[1] ?? "0";
-      const url = match[1];
-      index = parseInt(chapter);
+      const index = parseInt(chapter);
 
-      matches.push({
+      chapters.push({
         id,
         title,
         chapter,
         url,
         index,
       });
-    }
+    });
 
-    return matches.reverse();
+    return chapters.reverse();
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
-    const res = await fetch(`${this.baseUrl}${chapterId}`, {
+    const html = await this.getReadingPageHtml(chapterId);
+
+    if (!html) return [];
+
+    const $ = LoadDoc(html);
+
+    const pages: ChapterPage[] = [];
+
+    $("img.rk-img.h-auto").each((i, e) => {
+      pages.push({
+        url: e.attr("src"),
+        index: i + 1,
+      });
+    });
+
+    return pages;
+  }
+
+  async getReadingPageHtml(chapterId: string): string | null {
+    const chapterUrl = `${this.baseUrl}${chapterId}`;
+    const resRedirect = await fetch(chapterUrl, {
       headers: { Referer: `${this.baseUrl}/` },
     });
 
-    if (!res.ok) return [];
+    if (!resRedirect.ok) return [];
 
-    const html = await res.text();
+    const formHtml = await resRedirect.text();
 
-    const regexSrc = /<img[^>]*src="([^"]*)"[^>]*>/gi;
-    const listPages = [...html.matchAll(regexSrc)].map((match) => match[1]);
+    const $ = LoadDoc(formHtml);
+    const data = {
+      actionUrl: $("form#rk_madara_redirect").attr("action"),
+      rt: $("input[name=rt]").attr("value"),
+      chapter_id: $("input[name=chapter_id]").attr("value"),
+      manga_id: $("input[name=manga_id]").attr("value"),
+    };
 
-    return listPages
-      .filter((url) => url.includes("/WP-manga/"))
-      .map((match, index) => ({
-        url: match.trim(),
-        index: index + 1,
-        headers: { Referer: `${this.baseUrl}${chapterId}` },
-      }));
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      formData.set(key, value.toString());
+    });
+
+    const res = await fetch(data.actionUrl, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+
+    if (!res.ok) return null;
+
+    return res.text();
   }
 }
