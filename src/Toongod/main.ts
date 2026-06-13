@@ -47,7 +47,13 @@ class Provider {
         searchList.push({
           id,
           title,
-          image,
+          image: new URL(
+            `${image}&headers=${JSON.stringify({
+              Referer: `${this.baseUrl}`,
+              "User-Agent": this.userAgent,
+              Cookie: this.cookies,
+            })}`,
+          ).href,
         });
       }
     });
