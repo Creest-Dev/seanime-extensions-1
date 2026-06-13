@@ -1,11 +1,11 @@
 {
   "id": "toongod",
   "name": "Toongod",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/Toongod/manifest.json",
   "language": "typescript",
   "type": "manga-provider",
-  "description": "Toongod is a scanlator dedicated to mangas in spanish, providing high-quality scans and translations.",
+  "description": "An extension for Seanime for Toongod, which is a website that publishes Korean, Japanese, and Chinese comics in English.",
   "author": "branrgx",
   "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/Toongod/icon.png",
   "lang": "en",
