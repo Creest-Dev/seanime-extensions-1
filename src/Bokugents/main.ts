@@ -12,7 +12,7 @@ interface SerieSearchResponse {
 class Provider {
   private useProxyBypass = "{{useProxyBypass}}";
   private proxyBypassUrl = "{{proxyBypassUrl}}";
-  private webUrl = "https://bokugents.com";
+  private baseUrl = "https://bokugents.com";
   private cookies = "";
   private userAgent = "";
 
@@ -28,17 +28,29 @@ class Provider {
   }
 
   async search(opts: QueryOptions): Promise<SearchResult[]> {
-    const data = await this.searchFetch(opts);
+    const formData = new FormData();
+    formData.append("action", "ts_ac_do_search");
+    formData.append("ts_ac_query", opts.query.trim());
 
-    if (!data) return [];
+    const res = await this.safeFetch(
+      `${this.baseUrl}/wp-admin/admin-ajax.php`,
+      {
+        method: "POST",
+        body: formData,
+      },
+    );
+
+    if (!res.ok) return [];
+
+    const data: SerieSearchResponse = await res.json();
 
     const series = data.series[0].all;
     return series.map((item) => ({
-      id: item.post_link.split(this.webUrl)[1],
+      id: item.post_link.split(this.baseUrl)[1],
       title: item.post_title,
       image: new URL(
         `${item.post_image}&headers=${JSON.stringify({
-          Referer: `${this.webUrl}`,
+          Referer: `${this.baseUrl}`,
           "User-Agent": this.userAgent,
           Cookie: this.cookies,
         })}`,
@@ -47,8 +59,11 @@ class Provider {
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
-    const html = await this.findFetch(mangaId);
-    if (!html) return [];
+    const res = await this.safeFetch(`${this.baseUrl}${mangaId}`);
+
+    if (!res.ok) return [];
+
+    const html = await res.text();
 
     const $ = LoadDoc(html);
 
@@ -57,13 +72,13 @@ class Provider {
       .children("li")
       .each((i, e) => {
         const url = e.find(".eph-num>a").attr("href")?.trim() ?? "";
-        const id = url.split(this.webUrl)[1];
+        const id = url.split(this.baseUrl)[1];
         const title = e
           .find(".chapternum")
           .text()
           .trim()
           .replace("Chapter", "Capítulo");
-        const chapter = e.attr("data-num");
+        const chapter = e.attr("data-num")?.trim() ?? "";
         const updatedAt = new Date(e.find(".chapterdate").text()).toString();
 
         chapters.push({
@@ -85,8 +100,11 @@ class Provider {
   }
 
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
-    const html = await this.findFetch(chapterId);
-    if (!html) return [];
+    const res = await this.safeFetch(`${this.baseUrl}${chapterId}`);
+
+    if (!res.ok) return [];
+
+    const html = await res.text();
 
     const sourcesRegex = /"sources":\s*(\[[\s\S]*?\})\s*\]/;
     const match = html.match(sourcesRegex);
@@ -100,7 +118,7 @@ class Provider {
         index,
         url: new URL(url).href,
         headers: {
-          Referer: `${this.webUrl}${chapterId}`,
+          Referer: `${this.baseUrl}${chapterId}`,
           "User-Agent": this.userAgent,
           Cookie: this.cookies,
         },
@@ -110,85 +128,53 @@ class Provider {
     }
   }
 
-  private proxyReq(data: string) {
-    return fetch(`${this.proxyBypassUrl}/v1`, {
-      method: "post",
-      headers: { "Content-Type": "application/json" },
-      body: data,
-    });
-  }
-
-  async searchFetch(opts: QueryOptions): Promise<SerieSearchResponse | null> {
-    const url = `${this.webUrl}/wp-admin/admin-ajax.php`;
+  private async getValidSessionHeaders(): Promise<void> {
     try {
-      if (!this.stringToBool(this.useProxyBypass)) {
-        const formData = new FormData();
-        formData.append("action", "ts_ac_do_search");
-        formData.append("ts_ac_query", opts.query.trim());
-
-        const res = await fetch(url, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!res.ok) return null;
-
-        const data: SerieSearchResponse = await res.json();
-        return data;
-      }
-      const data = await this.proxyReq(
-        JSON.stringify({
-          cmd: "request.post",
-          url: url,
-          maxTimeout: 60000,
-          postData: `action=ts_ac_do_search&ts_ac_query=${opts.query.trim()}`,
-        }),
-      );
-      const res = await data.json();
-      const html = res.solution.response;
-
-      this.cookies = res.solution.cookies
-        .map((c: any) => `${c.name}=${c.value}`)
-        .join("; ");
-
-      this.userAgent = res.solution.userAgent;
-
-      const $ = LoadDoc(html);
-
-      const json = $("body").text();
-
-      return JSON.parse(json);
-    } catch {
-      return null;
-    }
-  }
-
-  async findFetch(id: string): Promise<string | null> {
-    const url = `${this.webUrl}${id}`;
-    try {
-      if (!this.stringToBool(this.useProxyBypass)) {
-        const res = await fetch(url);
-        if (!res.ok) return null;
-        return res.text();
-      }
-      const series = await this.proxyReq(
-        JSON.stringify({
+      const res = await fetch(`${this.proxyBypassUrl}/v1`, {
+        method: "post",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           cmd: "request.get",
-          url: url,
+          url: `${this.baseUrl}/wp-content/uploads/2026/03/Logoboku.png`,
           maxTimeout: 60000,
         }),
-      );
-      const data = await series.json();
+      });
+      const data = await res.json();
 
-      this.cookies = data.solution.cookies
-        .map((c: any) => `${c.name}=${c.value}`)
-        .join("; ");
+      if (data.solution?.cookies) {
+        this.cookies = data.solution.cookies
+          .map((c: any) => `${c.name}=${c.value}`)
+          .join("; ");
+      }
 
-      this.userAgent = data.solution.userAgent;
+      if (data.solution?.userAgent) {
+        this.userAgent = data.solution.userAgent;
+      }
 
-      return data.solution.response;
-    } catch {
-      return null;
+      return;
+    } catch (e) {
+      console.error(e);
+      return;
     }
+  }
+
+  private async safeFetch(
+    input: string | URL | Request,
+    init: RequestInit | undefined = { headers: {} },
+  ): Promise<Response> {
+    if (this.stringToBool(this.useProxyBypass)) {
+      await this.getValidSessionHeaders();
+      this.useProxyBypass = "false";
+    }
+    const fetchOptions = {
+      ...init,
+      headers: {
+        ...init?.headers,
+        "User-Agent": this.userAgent,
+        Cookie: this.cookies,
+      },
+    };
+
+    return fetch(input, fetchOptions);
   }
 }
