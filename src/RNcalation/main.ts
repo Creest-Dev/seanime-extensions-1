@@ -18,12 +18,12 @@ class Provider {
 
     const $ = LoadDoc(html);
 
-    const titles = [];
+    const titles: SearchResult[] = [];
 
     $(".lib-grid")
       .children("a")
       .each((i, e) => {
-        const id = e.attr("href").trim();
+        const id = e.attr("href")?.trim() ?? "";
         const title = e
           .find("p.font-semibold.leading-snug.line-clamp-2")
           .text()
@@ -49,8 +49,8 @@ class Provider {
 
     const $ = LoadDoc(html);
 
-    const first = this.formatChapters($("#chapter-list").html());
-    const second = this.formatChapters($("template").html());
+    const first = this.formatChapters($("#chapter-list").html() ?? "");
+    const second = this.formatChapters($("template").html() ?? "");
 
     return first.concat(second).reverse();
   }
@@ -69,11 +69,11 @@ class Provider {
     $('div[class*="mx-auto"][class*="flex"][class*="flex-col"]')
       .children("div.page-wrap")
       .map((i, e) => {
-        const dataUrl = e.children(".page-img").attr("data-src");
-        const url = e.children(".page-img").attr("src");
+        const dataUrl = e.children(".page-img").attr("data-src")?.trim() ?? "";
+        const url = e.children(".page-img").attr("src")?.trim() ?? dataUrl;
 
         pages.push({
-          url: url ?? dataUrl,
+          url: url,
           index: i + 1,
           headers: { Referer: `${this.baseUrl}${chapterId}` },
         });
@@ -82,12 +82,12 @@ class Provider {
     return pages;
   }
 
-  private formatChapters(html): ChapterDetails[] {
+  private formatChapters(html: string): ChapterDetails[] {
     const $ = LoadDoc(html);
     const items: ChapterDetails[] = [];
 
     $("a").each((i, e) => {
-      const url = e.attr("href");
+      const url = e.attr("href")?.trim() ?? "";
       const cont = e
         .find('span[class*="flex-1"][class*="text-sm"]')
         .text()
@@ -108,7 +108,7 @@ class Provider {
         chapter: number.toString(),
         index: number,
         scanlator: scan,
-        updatedAt: new Date(date),
+        updatedAt: new Date(date).toString(),
       });
     });
 
