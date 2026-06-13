@@ -52,11 +52,11 @@ class Provider {
 
     const $ = LoadDoc(html);
 
-    const chapters = [];
+    const chapters: ChapterDetails[] = [];
     $("#chapterlist>ul")
       .children("li")
       .each((i, e) => {
-        const url = e.find(".eph-num>a").attr("href");
+        const url = e.find(".eph-num>a").attr("href")?.trim() ?? "";
         const id = url.split(this.webUrl)[1];
         const title = e
           .find(".chapternum")
@@ -64,7 +64,7 @@ class Provider {
           .trim()
           .replace("Chapter", "Capítulo");
         const chapter = e.attr("data-num");
-        const updatedAt = new Date(e.find(".chapterdate").text());
+        const updatedAt = new Date(e.find(".chapterdate").text()).toString();
 
         chapters.push({
           id,
@@ -72,6 +72,7 @@ class Provider {
           title,
           chapter,
           updatedAt,
+          index: i,
         });
       });
 
@@ -117,7 +118,7 @@ class Provider {
     });
   }
 
-  async searchFetch(opts: QueryOptions): SerieSearchResponse | null {
+  async searchFetch(opts: QueryOptions): Promise<SerieSearchResponse | null> {
     const url = `${this.webUrl}/wp-admin/admin-ajax.php`;
     try {
       if (!this.stringToBool(this.useProxyBypass)) {
@@ -130,9 +131,10 @@ class Provider {
           body: formData,
         });
 
-        if (!res.ok) return [];
+        if (!res.ok) return null;
 
         const data: SerieSearchResponse = await res.json();
+        return data;
       }
       const data = await this.proxyReq(
         JSON.stringify({
@@ -161,13 +163,13 @@ class Provider {
     }
   }
 
-  async findFetch(id: string): string | null {
+  async findFetch(id: string): Promise<string | null> {
     const url = `${this.webUrl}${id}`;
     try {
       if (!this.stringToBool(this.useProxyBypass)) {
         const res = await fetch(url);
         if (!res.ok) return null;
-        const html = await res.text();
+        return res.text();
       }
       const series = await this.proxyReq(
         JSON.stringify({
