@@ -1,0 +1,14 @@
+{
+  "urls": [
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/UchuujinProjects/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/RNcalation/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/OlympusScanlation/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/MhScans/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/ManhwaWeb/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/MangasNoSekai/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/MangasIn/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/LeerCapitulo/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/CerberusSeries/manifest.json",
+    "https://raw.githubusercontent.com/branrgx/seanime-extensions/main/src/Bokugents/manifest.json"
+  ]
+}
