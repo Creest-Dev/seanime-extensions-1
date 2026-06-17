@@ -1,0 +1,13 @@
+{
+  "id": "samurai",
+  "name": "SamuraiScan",
+  "version": "1.0.1",
+  "manifestURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/SamuraiScan/manifest.json",
+  "language": "typescript",
+  "type": "manga-provider",
+  "description": "SamuraiScan manhua provider for Seanime.",
+  "author": "branrgx",
+  "icon": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/SamuraiScan/icon.png",
+  "lang": "es",
+  "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/SamuraiScan/main.ts"
+}
