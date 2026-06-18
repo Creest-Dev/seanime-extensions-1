@@ -121,19 +121,26 @@ class Provider {
 
     const html = await res.text();
 
-    const regexSrc = /<img[^>]*src="([^"]*)"[^>]*>/gi;
-    const listPages = [...html.matchAll(regexSrc)].map((match) => match[1]);
+    const $ = LoadDoc(html);
 
-    return listPages
-      .filter(
-        (item) =>
-          item.startsWith(`${apiUrl}/storage/comics/`) &&
-          item.includes(chapterId.split("/")[0]),
-      )
-      .map((match, index) => ({
-        url: match.trim(),
-        index: index + 1,
-        headers: { Referer: `${webUrl}/capitulo/${chapterId}` },
-      }));
+    const pages: string[] = [];
+
+    $("div.flex.flex-col.rounded-xl.overflow-hidden.shadow-xl")
+      .children("div")
+      .each((i, e) => {
+        const img = e.find("img");
+        if (!img) return;
+
+        const url = img.attr("src");
+        if (!url) return;
+
+        pages.push(url.trim());
+      });
+
+    return pages.map((e, i) => ({
+      url: e.trim(),
+      index: i + 1,
+      headers: { Referer: `${webUrl}/capitulo/${chapterId}` },
+    }));
   }
 }
