@@ -35,7 +35,7 @@ class Provider {
     return json.map((item: any) => ({
       id: item.data,
       title: item.value,
-      image: `${this.baseUrl}/uploads/manga/${item.data}/cover/cover_250x350.jpg`,
+      image: `${this.baseUrl}/uploads/manga/${item.data}/cover/cover_thumb.jpg`,
     }));
   }
 
