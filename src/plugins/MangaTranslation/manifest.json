@@ -15,6 +15,16 @@
   "payloadURI": "https://raw.githubusercontent.com/branrgx/seanime-extensions/master/src/plugins/MangaTranslation/main.ts",
   "plugin": {
     "version": "1",
-    "permissions": {}
+    "permissions": {
+      "scopes": [],
+      "allow": {
+        "unsafeFlags": [
+          {
+            "flag": "dom-script-manipulation",
+            "reason": "Enter your reason here, this will be shown to the user."
+          }
+        ]
+      }
+    }
   }
 }
