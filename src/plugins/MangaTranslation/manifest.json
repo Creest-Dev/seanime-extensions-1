@@ -12,7 +12,7 @@
   "readme": "",
   "notes": "",
   "lang": "multi",
-  "payloadURI": "/home/branrgx/Dev/seanime-extensions/src/plugins/MangaTranslation/main.ts",
+  "payloadURI": "file:///home/branrgx/Dev/seanime-extensions/src/plugins/MangaTranslation/main.ts",
   "plugin": {
     "version": "1",
     "permissions": {}
