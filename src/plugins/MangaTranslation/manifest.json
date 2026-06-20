@@ -16,12 +16,16 @@
   "plugin": {
     "version": "1",
     "permissions": {
-      "scopes": [],
+      "scopes": ["storage"],
       "allow": {
+        "networkAccess": {
+          "allowedDomains": ["api.toriitranslate.com", "*"],
+          "reasoning": "Download manga pages and send to Torii API"
+        },
         "unsafeFlags": [
           {
             "flag": "dom-script-manipulation",
-            "reason": "Enter your reason here, this will be shown to the user."
+            "reason": "Set img.src with data URLs from Torii"
           }
         ]
       }
