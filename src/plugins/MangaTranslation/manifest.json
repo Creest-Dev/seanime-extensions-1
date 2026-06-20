@@ -16,6 +16,5 @@
   "plugin": {
     "version": "1",
     "permissions": {}
-  },
-  "isDevelopment": true
+  }
 }
