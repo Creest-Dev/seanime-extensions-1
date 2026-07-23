@@ -5,15 +5,12 @@ class Provider {
   private proxyBypassUrl = "{{proxyBypassUrl}}";
   private baseUrl = "https://www.toongod.org";
 
-  // ── Cookie / session cache ─────────────────────────────────────
-  private cookies = "";
-  private userAgent = "";
-  private cookiesExpiry = 0;
+  // ── FlareSolverr session ───────────────────────────────────────
+  private sessionId = "";
+  private sessionReady = false;
 
-  // ── Search result cache ────────────────────────────────────────
-  // Maps a lowercase search term → SearchResult[]
+  // ── Search cache (best-effort, still useful sometimes) ─────────
   private searchCache = new Map<string, SearchResult[]>();
-  // Maps a lowercase synonym/title → the SearchResult it belongs to
   private synonymIndex = new Map<string, SearchResult>();
 
   getSettings(): Settings {
@@ -27,105 +24,92 @@ class Provider {
     return str.toLowerCase() === "true";
   }
 
-  // ── Solve challenge once, cache cookies ────────────────────────
+  // ── Create a persistent FlareSolverr browser session ───────────
   private async ensureSession(): Promise<void> {
-    // Reuse cookies if they haven't expired (cf_clearance lasts ~30 min)
-    if (this.cookies && Date.now() < this.cookiesExpiry) return;
-
     if (!this.stringToBool(this.useProxyBypass)) return;
+    if (this.sessionReady) return;
 
     try {
       const res = await fetch(`${this.proxyBypassUrl}/v1`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cmd: "request.get",
-          url: this.baseUrl,
-          maxTimeout: 90000,
+          cmd: "sessions.create",
         }),
       });
       const data = await res.json();
 
-      if (data.status === "ok" && data.solution?.cookies) {
-        this.cookies = data.solution.cookies
-          .map((c: any) => `${c.name}=${c.value}`)
-          .join("; ");
-        this.userAgent = data.solution.userAgent ?? "";
-
-        // Find cf_clearance expiry
-        const cfCookie = data.solution.cookies.find(
-          (c: any) => c.name === "cf_clearance",
-        );
-        if (cfCookie?.expiry) {
-          // Expire 5 min early to be safe
-          this.cookiesExpiry = (cfCookie.expiry - 300) * 1000;
-        } else {
-          // Default: 25 minutes from now
-          this.cookiesExpiry = Date.now() + 25 * 60 * 1000;
-        }
+      if (data.status === "ok" && data.session) {
+        this.sessionId = data.session;
+        this.sessionReady = true;
+        console.log(`FlareSolverr session created: ${this.sessionId}`);
       }
     } catch (e) {
-      console.error("Failed to get session:", e);
+      console.error("Failed to create FlareSolverr session:", e);
     }
   }
 
-  // ── Smart fetch: try cached cookies first, fall back to FlareSolverr
-  private async smartFetch(url: string): Promise<{ ok: boolean; html: string }> {
+  // ── Fetch through FlareSolverr using the persistent session ────
+  private async flareFetch(url: string): Promise<{ ok: boolean; html: string }> {
     if (!this.stringToBool(this.useProxyBypass)) {
       const res = await fetch(url);
       return { ok: res.ok, html: await res.text() };
     }
 
-    // 1) Try with cached cookies (fast, no FlareSolverr)
-    if (this.cookies && Date.now() < this.cookiesExpiry) {
-      try {
-        const res = await fetch(url, {
-          headers: {
-            "User-Agent": this.userAgent,
-            Cookie: this.cookies,
-          },
-        });
-        if (res.ok) {
-          return { ok: true, html: await res.text() };
-        }
-        // 403 → cookies rejected, fall through to FlareSolverr
-      } catch {
-        // Network error, fall through
-      }
-    }
+    await this.ensureSession();
 
-    // 2) Fall back to FlareSolverr (slow, ~12s)
     try {
+      const body: Record<string, unknown> = {
+        cmd: "request.get",
+        url,
+        maxTimeout: 90000,
+      };
+
+      // Attach session if we have one
+      if (this.sessionId) {
+        body.session = this.sessionId;
+      }
+
       const res = await fetch(`${this.proxyBypassUrl}/v1`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cmd: "request.get",
-          url,
-          maxTimeout: 90000,
-        }),
+        body: JSON.stringify(body),
       });
+
       const data = await res.json();
 
       if (data.status === "ok" && data.solution) {
-        // Refresh cached cookies from this response
-        if (data.solution.cookies) {
-          this.cookies = data.solution.cookies
-            .map((c: any) => `${c.name}=${c.value}`)
-            .join("; ");
-          this.userAgent = data.solution.userAgent ?? "";
-          const cfCookie = data.solution.cookies.find(
-            (c: any) => c.name === "cf_clearance",
-          );
-          this.cookiesExpiry = cfCookie?.expiry
-            ? (cfCookie.expiry - 300) * 1000
-            : Date.now() + 25 * 60 * 1000;
-        }
         return {
           ok: data.solution.status === 200,
           html: data.solution.response ?? "",
         };
       }
+
+      // Session may have expired — recreate and retry once
+      if (this.sessionId) {
+        console.warn("Session may be stale, recreating...");
+        this.sessionReady = false;
+        this.sessionId = "";
+        await this.ensureSession();
+
+        if (this.sessionId) {
+          body.session = this.sessionId;
+          const retry = await fetch(`${this.proxyBypassUrl}/v1`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const retryData = await retry.json();
+          if (retryData.status === "ok" && retryData.solution) {
+            return {
+              ok: retryData.solution.status === 200,
+              html: retryData.solution.response ?? "",
+            };
+          }
+        }
+      }
+
+      console.error("FlareSolverr error:", data.message);
       return { ok: false, html: "" };
     } catch (e) {
       console.error("FlareSolverr fetch failed:", e);
@@ -138,12 +122,12 @@ class Provider {
     const query = opts.query.trim();
     const cacheKey = query.toLowerCase();
 
-    // 1) Exact cache hit — return instantly (0 ms)
+    // 1) Exact cache hit
     if (this.searchCache.has(cacheKey)) {
       return this.searchCache.get(cacheKey)!;
     }
 
-    // 2) Synonym index hit — return the cached manga (0 ms)
+    // 2) Synonym index hit
     const synonymMatch = this.synonymIndex.get(cacheKey);
     if (synonymMatch) {
       const results = [synonymMatch];
@@ -151,9 +135,9 @@ class Provider {
       return results;
     }
 
-    // 3) No cache hit — actually search via network
+    // 3) Network search
     const encoded = query.replaceAll(" ", "+");
-    const { ok, html } = await this.smartFetch(
+    const { ok, html } = await this.flareFetch(
       `${this.baseUrl}/?s=${encoded}&post_type=wp-manga`,
     );
     if (!ok || !html) return [];
@@ -192,22 +176,20 @@ class Provider {
 
         series.push(result);
 
-        // ── Index every synonym + title for future lookups ──
+        // Index title + synonyms for future lookups
         this.synonymIndex.set(title.toLowerCase(), result);
         for (const syn of result.synonyms) {
           this.synonymIndex.set(syn.toLowerCase(), result);
         }
       });
 
-    // Cache this exact query
     this.searchCache.set(cacheKey, series);
-
     return series;
   }
 
-  // ── Chapters (uses smartFetch with cookie reuse) ───────────────
+  // ── Chapters ───────────────────────────────────────────────────
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
-    const { ok, html } = await this.smartFetch(`${this.baseUrl}${mangaId}`);
+    const { ok, html } = await this.flareFetch(`${this.baseUrl}${mangaId}`);
     if (!ok || !html) return [];
 
     const $ = LoadDoc(html);
@@ -220,7 +202,6 @@ class Provider {
       const titleParts = title.match(/Chapter\s+([\d.]+)(?:\s+(.+))?/i) ?? [];
       const chapter = titleParts[1] ?? "0";
       const index = parseInt(chapter);
-
       chapters.push({ id, title, chapter, url, index });
     });
 
@@ -229,7 +210,7 @@ class Provider {
 
   // ── Pages ──────────────────────────────────────────────────────
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
-    const { ok, html } = await this.smartFetch(`${this.baseUrl}${chapterId}`);
+    const { ok, html } = await this.flareFetch(`${this.baseUrl}${chapterId}`);
     if (!ok || !html) return [];
 
     const $ = LoadDoc(html);
@@ -243,13 +224,10 @@ class Provider {
           e.children("img").attr("src")?.trim() ??
           "";
         if (!url) return;
-
         pages.push({
           index: i + 1,
           url: new URL(url).href,
-          headers: {
-            Referer: `${this.baseUrl}${chapterId}`,
-          },
+          headers: { Referer: `${this.baseUrl}${chapterId}` },
         });
       });
 
