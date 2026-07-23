@@ -5,6 +5,17 @@ class Provider {
   private proxyBypassUrl = "{{proxyBypassUrl}}";
   private baseUrl = "https://www.toongod.org";
 
+  // ── Cookie / session cache ─────────────────────────────────────
+  private cookies = "";
+  private userAgent = "";
+  private cookiesExpiry = 0;
+
+  // ── Search result cache ────────────────────────────────────────
+  // Maps a lowercase search term → SearchResult[]
+  private searchCache = new Map<string, SearchResult[]>();
+  // Maps a lowercase synonym/title → the SearchResult it belongs to
+  private synonymIndex = new Map<string, SearchResult>();
+
   getSettings(): Settings {
     return {
       supportsMultiLanguage: false,
@@ -16,13 +27,12 @@ class Provider {
     return str.toLowerCase() === "true";
   }
 
-  // ── Route ALL requests through FlareSolverr ──────────────────────
-  private async flareFetch(url: string): Promise<{ ok: boolean; html: string }> {
-    if (!this.stringToBool(this.useProxyBypass)) {
-      // No proxy bypass – plain fetch
-      const res = await fetch(url);
-      return { ok: res.ok, html: await res.text() };
-    }
+  // ── Solve challenge once, cache cookies ────────────────────────
+  private async ensureSession(): Promise<void> {
+    // Reuse cookies if they haven't expired (cf_clearance lasts ~30 min)
+    if (this.cookies && Date.now() < this.cookiesExpiry) return;
+
+    if (!this.stringToBool(this.useProxyBypass)) return;
 
     try {
       const res = await fetch(`${this.proxyBypassUrl}/v1`, {
@@ -30,22 +40,92 @@ class Provider {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cmd: "request.get",
-          url,
-          maxTimeout: 90000,   // give it extra time; toongod can be slow
+          url: this.baseUrl,
+          maxTimeout: 90000,
         }),
       });
+      const data = await res.json();
 
+      if (data.status === "ok" && data.solution?.cookies) {
+        this.cookies = data.solution.cookies
+          .map((c: any) => `${c.name}=${c.value}`)
+          .join("; ");
+        this.userAgent = data.solution.userAgent ?? "";
+
+        // Find cf_clearance expiry
+        const cfCookie = data.solution.cookies.find(
+          (c: any) => c.name === "cf_clearance",
+        );
+        if (cfCookie?.expiry) {
+          // Expire 5 min early to be safe
+          this.cookiesExpiry = (cfCookie.expiry - 300) * 1000;
+        } else {
+          // Default: 25 minutes from now
+          this.cookiesExpiry = Date.now() + 25 * 60 * 1000;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to get session:", e);
+    }
+  }
+
+  // ── Smart fetch: try cached cookies first, fall back to FlareSolverr
+  private async smartFetch(url: string): Promise<{ ok: boolean; html: string }> {
+    if (!this.stringToBool(this.useProxyBypass)) {
+      const res = await fetch(url);
+      return { ok: res.ok, html: await res.text() };
+    }
+
+    // 1) Try with cached cookies (fast, no FlareSolverr)
+    if (this.cookies && Date.now() < this.cookiesExpiry) {
+      try {
+        const res = await fetch(url, {
+          headers: {
+            "User-Agent": this.userAgent,
+            Cookie: this.cookies,
+          },
+        });
+        if (res.ok) {
+          return { ok: true, html: await res.text() };
+        }
+        // 403 → cookies rejected, fall through to FlareSolverr
+      } catch {
+        // Network error, fall through
+      }
+    }
+
+    // 2) Fall back to FlareSolverr (slow, ~12s)
+    try {
+      const res = await fetch(`${this.proxyBypassUrl}/v1`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cmd: "request.get",
+          url,
+          maxTimeout: 90000,
+        }),
+      });
       const data = await res.json();
 
       if (data.status === "ok" && data.solution) {
+        // Refresh cached cookies from this response
+        if (data.solution.cookies) {
+          this.cookies = data.solution.cookies
+            .map((c: any) => `${c.name}=${c.value}`)
+            .join("; ");
+          this.userAgent = data.solution.userAgent ?? "";
+          const cfCookie = data.solution.cookies.find(
+            (c: any) => c.name === "cf_clearance",
+          );
+          this.cookiesExpiry = cfCookie?.expiry
+            ? (cfCookie.expiry - 300) * 1000
+            : Date.now() + 25 * 60 * 1000;
+        }
         return {
           ok: data.solution.status === 200,
           html: data.solution.response ?? "",
         };
       }
-
-      // FlareSolverr returned an error / timeout
-      console.error("FlareSolverr error:", data.message);
       return { ok: false, html: "" };
     } catch (e) {
       console.error("FlareSolverr fetch failed:", e);
@@ -53,11 +133,28 @@ class Provider {
     }
   }
 
-  // ── Search ───────────────────────────────────────────────────────
+  // ── Search with synonym cache ──────────────────────────────────
   async search(opts: QueryOptions): Promise<SearchResult[]> {
-    const query = opts.query.trim().replaceAll(" ", "+");
-    const { ok, html } = await this.flareFetch(
-      `${this.baseUrl}/?s=${query}&post_type=wp-manga`,
+    const query = opts.query.trim();
+    const cacheKey = query.toLowerCase();
+
+    // 1) Exact cache hit — return instantly (0 ms)
+    if (this.searchCache.has(cacheKey)) {
+      return this.searchCache.get(cacheKey)!;
+    }
+
+    // 2) Synonym index hit — return the cached manga (0 ms)
+    const synonymMatch = this.synonymIndex.get(cacheKey);
+    if (synonymMatch) {
+      const results = [synonymMatch];
+      this.searchCache.set(cacheKey, results);
+      return results;
+    }
+
+    // 3) No cache hit — actually search via network
+    const encoded = query.replaceAll(" ", "+");
+    const { ok, html } = await this.smartFetch(
+      `${this.baseUrl}/?s=${encoded}&post_type=wp-manga`,
     );
     if (!ok || !html) return [];
 
@@ -85,21 +182,32 @@ class Provider {
             ?.trim()
             .split(";") ?? [];
 
-        series.push({
+        const result: SearchResult = {
           id,
           title,
           synonyms: synonymsText.map((s) => s.trim()).filter(Boolean),
           year: year ? parseInt(year) : undefined,
           image,
-        });
+        };
+
+        series.push(result);
+
+        // ── Index every synonym + title for future lookups ──
+        this.synonymIndex.set(title.toLowerCase(), result);
+        for (const syn of result.synonyms) {
+          this.synonymIndex.set(syn.toLowerCase(), result);
+        }
       });
+
+    // Cache this exact query
+    this.searchCache.set(cacheKey, series);
 
     return series;
   }
 
-  // ── Chapters ─────────────────────────────────────────────────────
+  // ── Chapters (uses smartFetch with cookie reuse) ───────────────
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
-    const { ok, html } = await this.flareFetch(`${this.baseUrl}${mangaId}`);
+    const { ok, html } = await this.smartFetch(`${this.baseUrl}${mangaId}`);
     if (!ok || !html) return [];
 
     const $ = LoadDoc(html);
@@ -119,9 +227,9 @@ class Provider {
     return chapters.reverse();
   }
 
-  // ── Pages ────────────────────────────────────────────────────────
+  // ── Pages ──────────────────────────────────────────────────────
   async findChapterPages(chapterId: string): Promise<ChapterPage[]> {
-    const { ok, html } = await this.flareFetch(`${this.baseUrl}${chapterId}`);
+    const { ok, html } = await this.smartFetch(`${this.baseUrl}${chapterId}`);
     if (!ok || !html) return [];
 
     const $ = LoadDoc(html);
