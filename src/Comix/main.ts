@@ -1,6 +1,6 @@
 /// <reference path="../manga-provider.d.ts" />
 
-class Provider {
+export default class ComixProvider {
   private useProxyBypass = "{{useProxyBypass}}";
   private proxyBypassUrl = "{{proxyBypassUrl}}";
   private baseUrl = "https://comix.to";
@@ -41,6 +41,45 @@ class Provider {
       url.searchParams.set("page", String(page));
     }
     return url.href;
+  }
+
+  private normalizeTitle(value: string): string {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  private parseCardYear(cardText: string): number | undefined {
+    const yearMatch = cardText.match(/\b(19|20)\d{2}\b/);
+    return yearMatch ? Number.parseInt(yearMatch[0], 10) : undefined;
+  }
+
+  private scoreSearchResult(result: SearchResult, query: string, year?: number): number {
+    const normalizedQuery = this.normalizeTitle(query);
+    const normalizedTitle = this.normalizeTitle(result.title);
+    let score = 0;
+
+    if (normalizedTitle === normalizedQuery) {
+      score += 1000;
+    } else if (normalizedTitle.startsWith(`${normalizedQuery} `)) {
+      score += 600;
+    } else if (normalizedTitle.includes(normalizedQuery)) {
+      score += 300;
+    } else if (normalizedQuery.includes(normalizedTitle)) {
+      score += 100;
+    }
+
+    if (year && result.year === year) {
+      score += 200;
+    }
+
+    if (result.synonyms?.some((synonym) => this.normalizeTitle(synonym) === normalizedQuery)) {
+      score += 150;
+    }
+
+    return score;
   }
 
   private async ensureSession(): Promise<void> {
@@ -180,7 +219,7 @@ class Provider {
     const series: SearchResult[] = [];
     const seen = new Set<string>();
 
-    $("a[href*='/title/']").each((_i, element) => {
+    $("main a[href*='/title/']").each((_i, element) => {
       const href = element.attr("href")?.trim() ?? "";
       if (!href || seen.has(href)) return;
 
@@ -193,18 +232,26 @@ class Provider {
         "";
 
       const cardText = element.parent().text().replace(/\s+/g, " ").trim();
-      const yearMatch = cardText.match(/\b(19|20)\d{2}\b/);
+      const year = this.parseCardYear(cardText);
 
       const result: SearchResult = {
         id: this.toPath(href),
         title,
         image,
-        year: yearMatch ? Number.parseInt(yearMatch[0], 10) : undefined,
+        year,
       };
 
       series.push(result);
       seen.add(href);
-      this.synonymIndex.set(title.toLowerCase(), result);
+      this.synonymIndex.set(this.normalizeTitle(title), result);
+    });
+
+    series.sort((left, right) => {
+      const leftScore = this.scoreSearchResult(left, query, opts.year);
+      const rightScore = this.scoreSearchResult(right, query, opts.year);
+      if (rightScore !== leftScore) return rightScore - leftScore;
+      if ((right.year ?? 0) !== (left.year ?? 0)) return (right.year ?? 0) - (left.year ?? 0);
+      return left.title.localeCompare(right.title);
     });
 
     this.searchCache.set(cacheKey, series);
