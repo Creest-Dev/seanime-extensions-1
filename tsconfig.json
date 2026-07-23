@@ -10,4 +10,5 @@
     "types": ["node"],
   },
   "include": ["src"],
+  "exclude": ["src/Comix"],
 }

@@ -1,6 +1,7 @@
 /// <reference path="../manga-provider.d.ts" />
+/// <reference path="../core.d.ts" />
 
-export default class ComixProvider {
+class ComixProvider {
   private useProxyBypass = "{{useProxyBypass}}";
   private proxyBypassUrl = "{{proxyBypassUrl}}";
   private baseUrl = "https://comix.to";
@@ -219,7 +220,7 @@ export default class ComixProvider {
     const series: SearchResult[] = [];
     const seen = new Set<string>();
 
-    $("main a[href*='/title/']").each((_i, element) => {
+    $("main a[href*='/title/']").each((_i: number, element: any) => {
       const href = element.attr("href")?.trim() ?? "";
       if (!href || seen.has(href)) return;
 
@@ -269,7 +270,7 @@ export default class ComixProvider {
       const $ = LoadDoc(html);
       let pageCount = 0;
 
-      $("a[href*='/chapter-']").each((_i, element) => {
+      $("a[href*='/chapter-']").each((_i: number, element: any) => {
         const href = element.attr("href")?.trim() ?? "";
         if (!href) return;
 
@@ -312,7 +313,7 @@ export default class ComixProvider {
     const seen = new Set<string>();
     const referer = this.toAbsoluteUrl(chapterId);
 
-    $("img").each((_i, element) => {
+    $("img").each((_i: number, element: any) => {
       const imageUrl =
         element.attr("data-src")?.trim() ??
         element.attr("src")?.trim() ??
@@ -333,3 +334,5 @@ export default class ComixProvider {
     return pages;
   }
 }
+
+(globalThis as any).Provider = ComixProvider;
