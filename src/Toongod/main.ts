@@ -5,11 +5,10 @@ class Provider {
   private proxyBypassUrl = "{{proxyBypassUrl}}";
   private baseUrl = "https://www.toongod.org";
 
-  // ── FlareSolverr session ───────────────────────────────────────
-  private sessionId = "";
-  private sessionReady = false;
+  private sessionId = "toongod-seanime";
+  private sessionCreated = false;
 
-  // ── Search cache (best-effort, still useful sometimes) ─────────
+  // Search cache
   private searchCache = new Map<string, SearchResult[]>();
   private synonymIndex = new Map<string, SearchResult>();
 
@@ -24,10 +23,10 @@ class Provider {
     return str.toLowerCase() === "true";
   }
 
-  // ── Create a persistent FlareSolverr browser session ───────────
+  // ── Create persistent FlareSolverr session ─────────────────────
   private async ensureSession(): Promise<void> {
     if (!this.stringToBool(this.useProxyBypass)) return;
-    if (this.sessionReady) return;
+    if (this.sessionCreated) return;
 
     try {
       const res = await fetch(`${this.proxyBypassUrl}/v1`, {
@@ -35,21 +34,19 @@ class Provider {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cmd: "sessions.create",
+          session: this.sessionId,
         }),
       });
       const data = await res.json();
-
-      if (data.status === "ok" && data.session) {
-        this.sessionId = data.session;
-        this.sessionReady = true;
-        console.log(`FlareSolverr session created: ${this.sessionId}`);
+      if (data.status === "ok") {
+        this.sessionCreated = true;
       }
     } catch (e) {
-      console.error("Failed to create FlareSolverr session:", e);
+      console.error("[ToonGod] Session creation failed:", e);
     }
   }
 
-  // ── Fetch through FlareSolverr using the persistent session ────
+  // ── Fetch through FlareSolverr session ─────────────────────────
   private async flareFetch(url: string): Promise<{ ok: boolean; html: string }> {
     if (!this.stringToBool(this.useProxyBypass)) {
       const res = await fetch(url);
@@ -58,24 +55,23 @@ class Provider {
 
     await this.ensureSession();
 
+    const body: Record<string, unknown> = {
+      cmd: "request.get",
+      url,
+      maxTimeout: 90000,
+      disableMedia: true,
+    };
+
+    if (this.sessionCreated) {
+      body.session = this.sessionId;
+    }
+
     try {
-      const body: Record<string, unknown> = {
-        cmd: "request.get",
-        url,
-        maxTimeout: 90000,
-      };
-
-      // Attach session if we have one
-      if (this.sessionId) {
-        body.session = this.sessionId;
-      }
-
       const res = await fetch(`${this.proxyBypassUrl}/v1`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
       const data = await res.json();
 
       if (data.status === "ok" && data.solution) {
@@ -85,34 +81,36 @@ class Provider {
         };
       }
 
-      // Session may have expired — recreate and retry once
-      if (this.sessionId) {
-        console.warn("Session may be stale, recreating...");
-        this.sessionReady = false;
-        this.sessionId = "";
-        await this.ensureSession();
+      // Session may be dead — recreate and retry once
+      this.sessionCreated = false;
+      try {
+        await fetch(`${this.proxyBypassUrl}/v1`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cmd: "sessions.destroy", session: this.sessionId }),
+        });
+      } catch { /* ignore */ }
 
-        if (this.sessionId) {
-          body.session = this.sessionId;
-          const retry = await fetch(`${this.proxyBypassUrl}/v1`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          const retryData = await retry.json();
-          if (retryData.status === "ok" && retryData.solution) {
-            return {
-              ok: retryData.solution.status === 200,
-              html: retryData.solution.response ?? "",
-            };
-          }
+      await this.ensureSession();
+      if (this.sessionCreated) {
+        body.session = this.sessionId;
+        const retry = await fetch(`${this.proxyBypassUrl}/v1`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const retryData = await retry.json();
+        if (retryData.status === "ok" && retryData.solution) {
+          return {
+            ok: retryData.solution.status === 200,
+            html: retryData.solution.response ?? "",
+          };
         }
       }
 
-      console.error("FlareSolverr error:", data.message);
       return { ok: false, html: "" };
     } catch (e) {
-      console.error("FlareSolverr fetch failed:", e);
+      console.error("[ToonGod] Fetch error:", e);
       return { ok: false, html: "" };
     }
   }
@@ -122,12 +120,12 @@ class Provider {
     const query = opts.query.trim();
     const cacheKey = query.toLowerCase();
 
-    // 1) Exact cache hit
+    // Cache hit
     if (this.searchCache.has(cacheKey)) {
       return this.searchCache.get(cacheKey)!;
     }
 
-    // 2) Synonym index hit
+    // Synonym hit
     const synonymMatch = this.synonymIndex.get(cacheKey);
     if (synonymMatch) {
       const results = [synonymMatch];
@@ -135,7 +133,7 @@ class Provider {
       return results;
     }
 
-    // 3) Network search
+    // Network search
     const encoded = query.replaceAll(" ", "+");
     const { ok, html } = await this.flareFetch(
       `${this.baseUrl}/?s=${encoded}&post_type=wp-manga`,
@@ -176,7 +174,7 @@ class Provider {
 
         series.push(result);
 
-        // Index title + synonyms for future lookups
+        // Index title + synonyms
         this.synonymIndex.set(title.toLowerCase(), result);
         for (const syn of result.synonyms) {
           this.synonymIndex.set(syn.toLowerCase(), result);
