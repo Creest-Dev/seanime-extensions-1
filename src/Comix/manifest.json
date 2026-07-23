@@ -1,7 +1,7 @@
 {
   "id": "comix-to",
   "name": "Comix",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "manifestURI": "https://raw.githubusercontent.com/Creest-Dev/seanime-extensions-1/refs/heads/main/src/Comix/manifest.json",
   "language": "typescript",
   "type": "manga-provider",
