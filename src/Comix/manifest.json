@@ -1,0 +1,31 @@
+{
+  "id": "comix-to",
+  "name": "Comix",
+  "version": "1.0.0",
+  "manifestURI": "https://raw.githubusercontent.com/Creest-Dev/seanime-extensions-1/refs/heads/main/src/Comix/manifest.json",
+  "language": "typescript",
+  "type": "manga-provider",
+  "description": "An extension for Seanime for comix.to, a website that publishes manga, manhwa, and manhua in English.",
+  "author": "branrgx",
+  "icon": "https://comix.to/favicon.ico",
+  "lang": "en",
+  "payloadURI": "https://raw.githubusercontent.com/Creest-Dev/seanime-extensions-1/refs/heads/main/src/Comix/main.ts",
+  "userConfig": {
+    "requiresConfig": false,
+    "version": 1,
+    "fields": [
+      {
+        "name": "useProxyBypass",
+        "label": "Use proxy cloudflare bypass",
+        "type": "switch",
+        "default": "true"
+      },
+      {
+        "name": "proxyBypassUrl",
+        "label": "FlareSolverr Proxy URL",
+        "type": "text",
+        "default": "http://127.0.0.1:8191"
+      }
+    ]
+  }
+}

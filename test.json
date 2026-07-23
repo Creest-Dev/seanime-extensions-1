@@ -1,0 +1,5 @@
+﻿{
+  "model": "qwen2.5-coder:14b",
+  "messages": [{"role": "user", "content": "list files in this folder"}],
+  "tools": [{"type": "function", "function": {"name": "run_shell_command", "description": "Run a shell command", "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}}]
+}
