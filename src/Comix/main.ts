@@ -57,6 +57,21 @@ class ComixProvider {
     return yearMatch ? Number.parseInt(yearMatch[0], 10) : undefined;
   }
 
+  private parseCardFollows(cardText: string): number {
+    const match = cardText.match(/follows\s+([\d,]+)/i);
+    if (!match?.[1]) return 0;
+    return Number.parseInt(match[1].replace(/,/g, ""), 10) || 0;
+  }
+
+  private parseCardType(cardText: string): number {
+    const upper = cardText.toUpperCase();
+    if (/\bMANGA\b/.test(upper)) return 3;
+    if (/\bMANHWA\b/.test(upper)) return 2;
+    if (/\bMANHUA\b/.test(upper)) return 2;
+    if (/\bOTHER\b/.test(upper)) return 1;
+    return 0;
+  }
+
   private scoreSearchResult(result: SearchResult, query: string, year?: number): number {
     const normalizedQuery = this.normalizeTitle(query);
     const normalizedTitle = this.normalizeTitle(result.title);
@@ -212,12 +227,19 @@ class ComixProvider {
     const searchUrl = new URL("/browse", this.baseUrl);
     searchUrl.searchParams.set("q", query);
     searchUrl.searchParams.set("sort", "relevance:desc");
+    searchUrl.searchParams.set("content_rating", "safe,suggestive,pornographic,erotica");
 
     const { ok, html } = await this.flareFetch(searchUrl.href);
     if (!ok || !html) return [];
 
     const $ = LoadDoc(html);
-    const series: SearchResult[] = [];
+    const series: Array<{
+      result: SearchResult;
+      follows: number;
+      typeRank: number;
+      yearRank: number;
+      queryRank: number;
+    }> = [];
     const seen = new Set<string>();
 
     $("main a[href*='/title/']").each((_i: number, element: any) => {
@@ -234,6 +256,8 @@ class ComixProvider {
 
       const cardText = element.parent().text().replace(/\s+/g, " ").trim();
       const year = this.parseCardYear(cardText);
+      const follows = this.parseCardFollows(cardText);
+      const typeRank = this.parseCardType(cardText);
 
       const result: SearchResult = {
         id: this.toPath(href),
@@ -242,21 +266,35 @@ class ComixProvider {
         year,
       };
 
-      series.push(result);
+      series.push({
+        result,
+        follows,
+        typeRank,
+        yearRank: year ?? 0,
+        queryRank: this.scoreSearchResult(result, query, opts.year),
+      });
       seen.add(href);
       this.synonymIndex.set(this.normalizeTitle(title), result);
     });
 
     series.sort((left, right) => {
-      const leftScore = this.scoreSearchResult(left, query, opts.year);
-      const rightScore = this.scoreSearchResult(right, query, opts.year);
-      if (rightScore !== leftScore) return rightScore - leftScore;
-      if ((right.year ?? 0) !== (left.year ?? 0)) return (right.year ?? 0) - (left.year ?? 0);
-      return left.title.localeCompare(right.title);
+      const leftTitle = this.normalizeTitle(left.result.title);
+      const rightTitle = this.normalizeTitle(right.result.title);
+      const normalizedQuery = this.normalizeTitle(query);
+
+      if (leftTitle === normalizedQuery && rightTitle !== normalizedQuery) return -1;
+      if (rightTitle === normalizedQuery && leftTitle !== normalizedQuery) return 1;
+
+      if (right.queryRank !== left.queryRank) return right.queryRank - left.queryRank;
+      if (right.typeRank !== left.typeRank) return right.typeRank - left.typeRank;
+      if (right.follows !== left.follows) return right.follows - left.follows;
+      if ((left.result.year ?? 0) !== (right.result.year ?? 0)) return (left.result.year ?? 0) - (right.result.year ?? 0);
+      return left.result.title.localeCompare(right.result.title);
     });
 
-    this.searchCache.set(cacheKey, series);
-    return series;
+    const results = series.map((entry) => entry.result);
+    this.searchCache.set(cacheKey, results);
+    return results;
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
