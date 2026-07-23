@@ -229,6 +229,8 @@ class ComixProvider {
     searchUrl.searchParams.set("sort", "best_match");
     searchUrl.searchParams.set("content_rating", "safe,suggestive,pornographic,erotica");
 
+    console.log("[comix.to] search", { query, url: searchUrl.href });
+
     const { ok, html } = await this.flareFetch(searchUrl.href);
     if (!ok || !html) return [];
 
@@ -284,6 +286,7 @@ class ComixProvider {
     });
 
     const results = series.map((entry) => entry.result);
+    console.log("[comix.to] search results", results.slice(0, 5).map((result) => ({ id: result.id, title: result.title })));
     this.searchCache.set(cacheKey, results);
     return results;
   }
