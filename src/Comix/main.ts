@@ -98,22 +98,6 @@ class ComixProvider {
     return score;
   }
 
-  private buildSearchUrls(query: string): string[] {
-    const browseUrl = new URL("/browse", this.baseUrl);
-    browseUrl.searchParams.set("q", query);
-    browseUrl.searchParams.set("sort", "best_match");
-    browseUrl.searchParams.set(
-      "content_rating",
-      "safe,suggestive,pornographic,erotica",
-    );
-
-    const legacySearchUrl = new URL("/", this.baseUrl);
-    legacySearchUrl.searchParams.set("s", query);
-    legacySearchUrl.searchParams.set("post_type", "wp-manga");
-
-    return [browseUrl.href, legacySearchUrl.href];
-  }
-
   private async ensureSession(): Promise<void> {
     if (!this.stringToBool(this.useProxyBypass)) return;
     if (this.sessionCreated) return;
@@ -240,96 +224,68 @@ class ComixProvider {
       return results;
     }
 
-    const normalizedQuery = this.normalizeTitle(query);
+    const searchUrl = new URL("/browse", this.baseUrl);
+    searchUrl.searchParams.set("q", query);
+    searchUrl.searchParams.set("sort", "best_match");
+    searchUrl.searchParams.set("content_rating", "safe,suggestive,pornographic,erotica");
 
-    for (const searchUrl of this.buildSearchUrls(query)) {
-      const { ok, html } = await this.flareFetch(searchUrl);
-      if (!ok || !html) continue;
+    const { ok, html } = await this.flareFetch(searchUrl.href);
+    if (!ok || !html) return [];
 
-      const $ = LoadDoc(html);
-      const series: Array<{
-        result: SearchResult;
-        follows: number;
-        typeRank: number;
-        yearRank: number;
-        queryRank: number;
-      }> = [];
-      const seen = new Set<string>();
+    const $ = LoadDoc(html);
+    const series: Array<{
+      result: SearchResult;
+      follows: number;
+      typeRank: number;
+      queryRank: number;
+    }> = [];
+    const seen = new Set<string>();
 
-      $("main .list-wrap .lrow").each((_i: number, row: any) => {
-        const titleLink = row.find("a.lrow__title-link");
-        const posterLink = row.find("a.lrow__poster");
+    $("main .list-grid--cards a.card[href*='/title/']").each((_i: number, element: any) => {
+      const href = element.attr("href")?.trim() ?? "";
+      if (!href || seen.has(href)) return;
 
-        const href = titleLink.attr("href")?.trim() ?? posterLink.attr("href")?.trim() ?? "";
-        if (!href || seen.has(href)) return;
+      const title = element.find(".card__title").text().replace(/\s+/g, " ").trim();
+      if (!title) return;
 
-        const title = titleLink.text().replace(/\s+/g, " ").trim() || (posterLink.attr("aria-label")?.trim() ?? "");
-        if (!title) return;
+      const image =
+        element.find("img").attr("data-src")?.trim() ??
+        element.find("img").attr("src")?.trim() ??
+        "";
 
-        const image =
-          row.find("a.lrow__poster img").attr("data-src")?.trim() ??
-          row.find("a.lrow__poster img").attr("src")?.trim() ??
-          "";
+      const cardText = element.text().replace(/\s+/g, " ").trim();
+      const year = this.parseCardYear(cardText);
+      const follows = this.parseCardFollows(cardText);
+      const typeRank = this.parseCardType(cardText);
 
-        const cardText = row.text().replace(/\s+/g, " ").trim();
-        const year = this.parseCardYear(cardText);
-        const follows = this.parseCardFollows(cardText);
-        const typeRank = this.parseCardType(cardText);
+      const result: SearchResult = {
+        id: this.toPath(href),
+        title,
+        image,
+        year,
+      };
 
-        const result: SearchResult = {
-          id: this.toPath(href),
-          title,
-          image,
-          year,
-        };
-
-        series.push({
-          result,
-          follows,
-          typeRank,
-          yearRank: year ?? 0,
-          queryRank: this.scoreSearchResult(result, query, opts.year),
-        });
-        seen.add(href);
-        this.synonymIndex.set(this.normalizeTitle(title), result);
+      series.push({
+        result,
+        follows,
+        typeRank,
+        queryRank: this.scoreSearchResult(result, query, opts.year),
       });
+      seen.add(href);
+      this.synonymIndex.set(this.normalizeTitle(title), result);
+    });
 
-      if (!series.length) continue;
+    series.sort((left, right) => {
+      if (right.queryRank !== left.queryRank) return right.queryRank - left.queryRank;
+      if (right.typeRank !== left.typeRank) return right.typeRank - left.typeRank;
+      if (right.follows !== left.follows) return right.follows - left.follows;
+      if ((left.result.year ?? 0) !== (right.result.year ?? 0)) return (left.result.year ?? 0) - (right.result.year ?? 0);
+      return left.result.title.localeCompare(right.result.title);
+    });
 
-      const hasQueryMatch = series.some((entry) => {
-        const title = this.normalizeTitle(entry.result.title);
-        return (
-          title === normalizedQuery ||
-          title.includes(normalizedQuery) ||
-          normalizedQuery.includes(title) ||
-          entry.result.synonyms?.some((synonym) => this.normalizeTitle(synonym) === normalizedQuery)
-        );
-      });
-
-      if (!hasQueryMatch && searchUrl.includes("/browse")) {
-        continue;
-      }
-
-      series.sort((left, right) => {
-        const leftTitle = this.normalizeTitle(left.result.title);
-        const rightTitle = this.normalizeTitle(right.result.title);
-
-        if (leftTitle === normalizedQuery && rightTitle !== normalizedQuery) return -1;
-        if (rightTitle === normalizedQuery && leftTitle !== normalizedQuery) return 1;
-
-        if (right.queryRank !== left.queryRank) return right.queryRank - left.queryRank;
-        if (right.typeRank !== left.typeRank) return right.typeRank - left.typeRank;
-        if (right.follows !== left.follows) return right.follows - left.follows;
-        if ((left.result.year ?? 0) !== (right.result.year ?? 0)) return (left.result.year ?? 0) - (right.result.year ?? 0);
-        return left.result.title.localeCompare(right.result.title);
-      });
-
-      const results = series.map((entry) => entry.result);
-      this.searchCache.set(cacheKey, results);
-      return results;
-    }
-
-    return [];
+    const results = series.map((entry) => entry.result);
+    this.searchCache.set(cacheKey, results);
+    return results;
   }
 
   async findChapters(mangaId: string): Promise<ChapterDetails[]> {
